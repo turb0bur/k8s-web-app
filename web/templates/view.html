@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}User Details{% endblock %}
+{% block heading %}User Details{% endblock %}
+
+{% block content %}
+    <dl class="row">
+        <dt class="col-sm-3">First Name:</dt>
+        <dd class="col-sm-9">{{ user.first_name }}</dd>
+
+        <dt class="col-sm-3">Last Name:</dt>
+        <dd class="col-sm-9">{{ user.last_name }}</dd>
+
+        <dt class="col-sm-3">Email:</dt>
+        <dd class="col-sm-9">{{ user.email }}</dd>
+    </dl>
+    <a href="/users/{{ user.id }}/edit" class="btn btn-warning">Edit</a>
+    <form action="/users/{{ user.id }}/delete" method="post" style="display:inline-block;">
+        <input type="hidden" name="_method" value="delete">
+        <button type="submit" class="btn btn-danger">Delete</button>
+    </form>
+    <a href="/users" class="btn btn-secondary">Back to User List</a>
+{% endblock %}

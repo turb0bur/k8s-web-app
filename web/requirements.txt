@@ -1,0 +1,19 @@
+# Web framework
+fastapi~=0.85
+Flask~=2.0
+
+# ASGI server for FastAPI
+uvicorn~=0.18
+
+# Template engine for rendering HTML
+jinja2~=3.0
+
+# Database ORM and adapter
+sqlalchemy~=1.4
+psycopg2-binary~=2.9
+
+# Data validation and settings management
+pydantic~=1.9
+
+# For handling multipart form data
+python-multipart~=0.0.5
