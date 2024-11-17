@@ -17,5 +17,5 @@ USER appuser
 
 EXPOSE 5000
 
-ENTRYPOINT ["uvicorn", "app:app", "--host", "0.0.0.0"]
+ENTRYPOINT ["uvicorn", "main:app", "--host", "0.0.0.0"]
 CMD ["--port", "5000"]
