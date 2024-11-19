@@ -65,6 +65,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build Docker image
+        id: build_image
         run: |
           SHORT_SHA=${{ github.sha }} && SHORT_SHA=${SHORT_SHA::7}
           docker buildx build \
