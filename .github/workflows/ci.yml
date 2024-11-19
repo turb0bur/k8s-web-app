@@ -79,22 +79,22 @@ jobs:
           SHORT_SHA=${{ github.sha }} && SHORT_SHA=${SHORT_SHA::7}
           if docker image inspect ${{ vars.DOCKER_USERNAME }}/${{ vars.DOCKER_REPOSITORY }}:${SHORT_SHA} > /dev/null 2>&1; then
             if docker history -q ${{ vars.DOCKER_USERNAME }}/${{ vars.DOCKER_REPOSITORY }}:${SHORT_SHA} | grep -q '<missing>'; then
-              echo "yes"
+              echo "result=yes" >> $GITHUB_ENV
             else
-              echo "no"
+              echo "result=no" >> $GITHUB_ENV
             fi
           else
-            echo "yes"
+            echo "result=yes" >> $GITHUB_ENV
           fi
         shell: bash
 
       - name: Log in to Docker Hub
-        if: steps.check_image.outputs.result == 'yes'
+        if: env.result == 'yes'
         run: |
           echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ vars.DOCKER_USERNAME }} --password-stdin
 
       - name: Push Docker image
-        if: steps.check_image.outputs.result == 'yes'
+        if: env.result == 'yes'
         run: |
           SHORT_SHA=${{ github.sha }} && SHORT_SHA=${SHORT_SHA::7}
           docker push ${{ vars.DOCKER_USERNAME }}/${{ vars.DOCKER_REPOSITORY }}:${SHORT_SHA}
