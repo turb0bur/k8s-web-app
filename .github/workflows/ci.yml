@@ -66,19 +66,25 @@ jobs:
 
       - name: Build Docker image
         run: |
+          SHORT_SHA=${{ github.sha }} && SHORT_SHA=${SHORT_SHA::7}
           docker buildx build \
             --cache-from=type=local,src=/tmp/.buildx-cache \
             --cache-to=type=local,dest=/tmp/.buildx-cache \
-            --tag ${{ vars.DOCKER_USERNAME }}/${{ vars.DOCKER_REPOSITORY }}:${{ github.sha }} \
+            --tag ${{ vars.DOCKER_USERNAME }}/${{ vars.DOCKER_REPOSITORY }}:${SHORT_SHA} \
             web/
 
       - name: Check for changes in Docker image
         id: check_image
         run: |
-          if docker history -q ${{ vars.DOCKER_USERNAME }}/${{ vars.DOCKER_REPOSITORY }}:${{ github.sha }} | grep -q '<missing>'; then
-            echo "yes"
+          SHORT_SHA=${{ github.sha }} && SHORT_SHA=${SHORT_SHA::7}
+          if docker image inspect ${{ vars.DOCKER_USERNAME }}/${{ vars.DOCKER_REPOSITORY }}:${SHORT_SHA} > /dev/null 2>&1; then
+            if docker history -q ${{ vars.DOCKER_USERNAME }}/${{ vars.DOCKER_REPOSITORY }}:${SHORT_SHA} | grep -q '<missing>'; then
+              echo "yes"
+            else
+              echo "no"
+            fi
           else
-            echo "no"
+            echo "yes"
           fi
         shell: bash
 
@@ -89,4 +95,6 @@ jobs:
 
       - name: Push Docker image
         if: steps.check_image.outputs.result == 'yes'
-        run: docker push ${{ vars.DOCKER_USERNAME }}/${{ vars.DOCKER_REPOSITORY }}:${{ github.sha }}
+        run: |
+          SHORT_SHA=${{ github.sha }} && SHORT_SHA=${SHORT_SHA::7}
+          docker push ${{ vars.DOCKER_USERNAME }}/${{ vars.DOCKER_REPOSITORY }}:${SHORT_SHA}
