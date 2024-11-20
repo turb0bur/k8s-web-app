@@ -1,0 +1,39 @@
+app:
+  config:
+    name: app-config
+  secret:
+    name: app-secret
+    data:
+      SECRET_KEY: <your-app-secret>
+  deployment:
+    name: app-deployment
+    replicas: 1
+    image:
+      repository: turb0bur/flask-crud
+      tag: latest
+      pullPolicy: IfNotPresent
+  service:
+    name: app-service
+    type: NodePort
+    port: 5000
+    targetPort: 5000
+    nodePort: 30080
+
+db:
+  secret:
+    name: postgres-secret
+    data:
+      POSTGRES_DB: webapp
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: <your-db-password>
+  statefulset:
+    name: postgres-statefulset
+    serviceName: postgres-service
+    replicas: 1
+    port: 5432
+    storage: 1Gi
+  service:
+    name: postgres-service
+    type: ClusterIP
+    port: 5432
+    targetPort: 5432

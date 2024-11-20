@@ -1,25 +1,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: app-deployment
-  namespace: web-app
+  name: {{ .Values.app.deployment.name }}
+  namespace: {{ .Release.Namespace }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.app.deployment.replicas }}
   selector:
     matchLabels:
-      app: python-app
+      {{ include "appLabels" . }}
   template:
     metadata:
       labels:
-        app: python-app
+        {{ include "appLabels" . }}
     spec:
       initContainers:
         - name: wait-for-postgres
           image: busybox
-          command: ['sh', '-c', 'until nc -z postgres-service 5432; do echo waiting for postgres; sleep 2; done;']
+          command: ['sh', '-c', 'until nc -z {{ .Values.db.service.name }} {{ .Values.db.service.port }}; do echo waiting for postgres; sleep 2; done;']
       containers:
       - name: python-web-app
-        image: turb0bur/flask-crud:latest
+        image: {{ .Values.app.deployment.image.repository }}:{{ .Values.app.deployment.image.tag }}
+        imagePullPolicy: {{ .Values.app.deployment.image.pullPolicy }}
         env:
         - name: SECRET_KEY
           valueFrom:

@@ -1,11 +1,11 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: postgres-statefulset
-  namespace: web-app
+  name: {{ .Values.db.statefulset.name }}
+  namespace: {{ .Release.Namespace }}
 spec:
-  serviceName: "postgres-headless"
-  replicas: 1
+  serviceName: {{ .Values.db.service.name }}-headless
+  replicas: {{ .Values.db.statefulset.replicas }}
   selector:
     matchLabels:
       app: postgres
@@ -34,7 +34,7 @@ spec:
               name: postgres-secret
               key: POSTGRES_PASSWORD
         ports:
-        - containerPort: 5432
+        - containerPort: {{ .Values.db.statefulset.port }}
           name: postgres
         volumeMounts:
         - name: postgres-storage
@@ -60,4 +60,4 @@ spec:
       accessModes: [ "ReadWriteOnce" ]
       resources:
         requests:
-          storage: 1Gi
+          storage: {{ .Values.db.statefulset.storage }}
