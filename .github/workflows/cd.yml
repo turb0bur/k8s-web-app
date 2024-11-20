@@ -1,0 +1,185 @@
+name: CD
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to deploy'
+        required: true
+        default: 'latest'
+      deployment_action:
+        description: 'Deployment action'
+        required: true
+        default: 'deploy'
+        type: choice
+        options:
+          - deploy
+          - delete
+      namespace:
+        description: 'Kubernetes namespace'
+        required: true
+        default: 'default'
+      bump_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set Environment Variables
+        id: setup_env
+        run: |
+          echo "Exporting required environment variables..."
+          echo "GCP_SA_KEY=${{ secrets.GCP_SA_KEY }}" >> $GITHUB_ENV
+          echo "GCP_PROJECT_ID=${{ vars.GCP_PROJECT_ID }}" >> $GITHUB_ENV
+          echo "CLUSTER_ZONE=${{ vars.GKE_CLUSTER_ZONE }}" >> $GITHUB_ENV
+          echo "CLUSTER_NAME=${{ vars.GKE_CLUSTER_NAME }}" >> $GITHUB_ENV
+          echo "DEPLOYMENT_ACTION=${{ github.event.inputs.deployment_action }}" >> $GITHUB_ENV
+          echo "K8S_NAMESPACE=${{ vars.K8S_NAMESPACE }}" >> $GITHUB_ENV
+          echo "RELEASE_NAME=${{ vars.HELM_RELEASE_NAME }}" >> $GITHUB_ENV
+          echo "IMAGE_TAG=${{ github.event.inputs.image_tag }}" >> $GITHUB_ENV
+          echo "VERSION_BUMP_TYPE=${{ github.event.inputs.bump_type }}" >> $GITHUB_ENV
+          echo "DB_NAME=${{ vars.DB_NAME }}" >> $GITHUB_ENV
+          echo "DB_USER=${{ vars.DB_USER }}" >> $GITHUB_ENV
+          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> $GITHUB_ENV
+          echo "SECRET_KEY=${{ secrets.APP_SECRET_KEY }}" >> $GITHUB_ENV
+
+      - name: Validate Inputs
+        run: |
+          echo "Validating image tag..."
+          if [[ "$IMAGE_TAG" != "latest" ]] && \
+             ! [[ "$IMAGE_TAG" =~ ^[a-f0-9]{7,}$ ]]; then
+            echo "Invalid image tag: $IMAGE_TAG."
+            echo "It must be 'latest' or a valid Git commit SHA (7+ characters)."
+            exit 1
+          fi
+          echo "Image tag validation passed."
+
+      - name: Helm Lint
+        run: |
+          echo "Linting Helm chart..."
+          helm lint ./helm
+
+      - name: Helm Dry-Run
+        if: env.DEPLOYMENT_ACTION == 'deploy'
+        run: |
+          echo "Performing Helm dry-run..."
+          helm upgrade --install $RELEASE_NAME ./helm \
+            ---namespace $K8S_NAMESPACE \
+            --set db.secret.data.POSTGRES_DB=$DB_NAME \
+            --set db.secret.data.POSTGRES_USER=$DB_USER \
+            --set db.secret.data.POSTGRES_PASSWORD=$DB_PASSWORD \
+            --set app.secret.data.SECRET_KEY=$SECRET_KEY \
+            --set app.deployment.image.tag=$IMAGE_TAG
+            --dry-run
+
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          version: 'latest'
+          service_account_key: $GCP_SA_KEY
+          project_id: $GCP_PROJECT_ID
+
+      - name: Authenticate to GKE
+        run: |
+          echo "Authenticating to GKE..."
+          gcloud container clusters get-credentials $CLUSTER_NAME \
+            --zone $CLUSTER_ZONE \
+            --project $GCP_PROJECT_ID
+
+      - name: Deploy with Helm
+        if: env.DEPLOYMENT_ACTION == 'deploy'
+
+        run: |
+          echo "Deploying Helm release..."
+          helm upgrade --install $RELEASE_NAME ./helm \
+            ---namespace $K8S_NAMESPACE \
+            --set db.secret.data.POSTGRES_DB=$DB_NAME \
+            --set db.secret.data.POSTGRES_USER=$DB_USER \
+            --set db.secret.data.POSTGRES_PASSWORD=$DB_PASSWORD \
+            --set app.secret.data.SECRET_KEY=$SECRET_KEY \
+            --set app.deployment.image.tag=$IMAGE_TAG
+      - name: Wait for Deployments to Stabilize
+        if: env.DEPLOYMENT_ACTION == 'deploy'
+        run: |
+          echo "Waiting for Kubernetes deployments to stabilize..."
+          deployments=$(kubectl get deployment -n $K8S_NAMESPACE -l "release=$RELEASE_NAME" -o jsonpath='{.items[*].metadata.name}')
+          for deployment in $deployments; do
+            kubectl rollout status deployment/$deployment -n $K8S_NAMESPACE
+          done
+
+      - name: Delete Helm Release
+        if: env.DEPLOYMENT_ACTION == 'delete'
+        run: |
+          echo "Deleting Helm release..."
+          helm delete $RELEASE_NAME -n $K8S_NAMESPACE
+
+      - name: Rollback on Failure
+        if: failure() && env.DEPLOYMENT_ACTION == 'deploy'
+        run: |
+          echo "Rolling back Helm release..."
+          previous_revision=$(helm history $RELEASE_NAME --max 2 | awk 'NR==3 {print $1}')
+          if [[ -n "$previous_revision" ]]; then
+            helm rollback $RELEASE_NAME "$previous_revision"
+          else
+            echo "No previous revision found, rollback skipped."
+            exit 1
+          fi
+
+  bump_versions:
+    needs: deploy
+    if: env.DEPLOYMENT_ACTION == 'deploy'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install bump2version
+        run: |
+          echo "Installing bump2version..."
+          pip install bump2version
+
+      - name: Update Chart.yaml with app version
+        run: |
+          echo "Updating Chart.yaml with app version..."
+          helm show chart ./helm > ./helm/Chart.yaml
+          sed -i "s/^appVersion:.*/appVersion: "$IMAGE_TAG/" ./helm/Chart.yaml
+
+      - name: Set Git Author
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "github-actions@github.com"
+
+      - name: Bump Helm Chart Version
+        run: |
+          echo "Bumping Helm chart version as $VERSION_BUMP_TYPE..."
+          bump2version $VERSION_BUMP_TYPE --allow-dirty
+
+  push_changes:
+    needs: bump_versions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Push Changes to GitHub
+        run: |
+          echo "Pushing updated Chart.yaml to GitHub..."
+          git push origin HEAD:main
