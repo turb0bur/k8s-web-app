@@ -138,11 +138,16 @@ jobs:
         if: failure() && ${{ github.event.inputs.deployment_action == 'deploy' }}
         run: |
           echo "Rolling back Helm release..."
-          previous_revision=$(helm history $RELEASE_NAME --max 2 | awk 'NR==3 {print $1}')
-          if [[ -n "$previous_revision" ]]; then
-            helm rollback $RELEASE_NAME "$previous_revision"
+          if helm history $RELEASE_NAME --max 1 | grep -q $RELEASE_NAME; then
+            previous_revision=$(helm history $RELEASE_NAME --max 2 | awk 'NR==3 {print $1}')
+            if [[ -n "$previous_revision" ]]; then
+              helm rollback $RELEASE_NAME "$previous_revision"
+            else
+              echo "No previous revision found, rollback skipped."
+              exit 1
+            fi
           else
-            echo "No previous revision found, rollback skipped."
+            echo "Release not found, rollback skipped."
             exit 1
           fi
 
