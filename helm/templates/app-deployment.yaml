@@ -21,6 +21,13 @@ spec:
       - name: python-web-app
         image: {{ .Values.app.deployment.image.repository }}:{{ .Values.app.deployment.image.tag }}
         imagePullPolicy: {{ .Values.app.deployment.image.pullPolicy }}
+        resources:
+          requests:
+            memory: {{ .Values.app.deployment.resources.requests.memory }}
+            cpu: {{ .Values.app.deployment.resources.requests.cpu }}
+          limits:
+            memory: {{ .Values.app.deployment.resources.limits.memory }}
+            cpu: {{ .Values.app.deployment.resources.limits.cpu }}
         env:
         - name: SECRET_KEY
           valueFrom:

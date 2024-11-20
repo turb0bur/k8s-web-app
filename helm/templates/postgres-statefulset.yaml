@@ -17,6 +17,13 @@ spec:
       containers:
       - name: postgres
         image: postgres:13
+        resources:
+          requests:
+            memory: {{ .Values.db.statefulset.resources.requests.memory }}
+            cpu: {{ .Values.db.statefulset.resources.requests.cpu }}
+          limits:
+            memory: {{ .Values.db.statefulset.resources.limits.memory }}
+            cpu: {{ .Values.db.statefulset.resources.limits.cpu }}
         env:
         - name: POSTGRES_DB
           valueFrom:

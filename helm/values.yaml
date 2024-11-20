@@ -12,6 +12,13 @@ app:
       repository: turb0bur/flask-crud
       tag: latest
       pullPolicy: IfNotPresent
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "500m"
+      limits:
+        memory: "512Mi"
+        cpu: "1"
   service:
     name: app-service
     type: NodePort
@@ -32,6 +39,13 @@ db:
     replicas: 1
     port: 5432
     storage: 1Gi
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "1"
   service:
     name: postgres-service
     type: ClusterIP
