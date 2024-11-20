@@ -3,14 +3,6 @@ name: CD
 on:
   workflow_dispatch:
     inputs:
-      enable_debug:
-        description: 'Enable debug'
-        required: false
-        default: 'false'
-        type: choice
-        options:
-          - 'true'
-          - 'false'
       image_tag:
         description: 'Image tag to deploy'
         required: true
@@ -48,8 +40,6 @@ jobs:
         id: setup_env
         run: |
           echo "Exporting required environment variables..."
-          echo "ACTIONS_RUNNER_DEBUG=${{ github.event.inputs.enable_debug }}" >> $GITHUB_ENV
-          echo "ACTIONS_STEP_DEBUG=${{ github.event.inputs.enable_debug }}" >> $GITHUB_ENV
           echo "GCP_PROJECT_ID=${{ vars.GCP_PROJECT_ID }}" >> $GITHUB_ENV
           echo "CLUSTER_ZONE=${{ vars.GKE_CLUSTER_ZONE }}" >> $GITHUB_ENV
           echo "CLUSTER_NAME=${{ vars.GKE_CLUSTER_NAME }}" >> $GITHUB_ENV
