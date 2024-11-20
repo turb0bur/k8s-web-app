@@ -172,13 +172,14 @@ jobs:
             previous_revision=$(helm history $RELEASE_NAME -n $K8S_NAMESPACE --max 2 | awk 'NR==3 {print $1}')
             if [[ -n "$previous_revision" ]]; then
               helm rollback $RELEASE_NAME -n $K8S_NAMESPACE "$previous_revision"
+              exit 1
             else
               echo "No previous revision found, rollback skipped."
-              exit 1
+              exit 0
             fi
           else
             echo "Release not found, rollback skipped."
-            exit 1
+            exit 0
           fi
 
   bump_versions:
