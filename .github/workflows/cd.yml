@@ -79,10 +79,7 @@ jobs:
           project_id: ${{ vars.GCP_PROJECT_ID }}
 
       - name: Authenticate to GKE
-        id: auth_gke
         run: |
-          echo "Authenticating to GKE..."
-          gcloud auth activate-service-account --key-file=${{ secrets.GCP_SA_KEY }}
           gcloud container clusters get-credentials $CLUSTER_NAME \
             --zone $CLUSTER_ZONE \
             --project $GCP_PROJECT_ID
