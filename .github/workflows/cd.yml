@@ -40,9 +40,6 @@ jobs:
         id: setup_env
         run: |
           echo "Exporting required environment variables..."
-          echo "GCP_SA_KEY<<EOF" >> $GITHUB_ENV
-          echo "${{ secrets.GCP_SA_KEY }}" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
           echo "GCP_PROJECT_ID=${{ vars.GCP_PROJECT_ID }}" >> $GITHUB_ENV
           echo "CLUSTER_ZONE=${{ vars.GKE_CLUSTER_ZONE }}" >> $GITHUB_ENV
           echo "CLUSTER_NAME=${{ vars.GKE_CLUSTER_NAME }}" >> $GITHUB_ENV
@@ -95,7 +92,7 @@ jobs:
         uses: google-github-actions/setup-gcloud@v1
         with:
           version: 'latest'
-          service_account_key: $GCP_SA_KEY
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
           project_id: $GCP_PROJECT_ID
 
       - name: Authenticate to GKE
