@@ -198,7 +198,7 @@ jobs:
       - name: Bump Helm Chart Version
         run: |
           echo "Bumping Helm chart version as $VERSION_BUMP_TYPE..."
-          bump2version $VERSION_BUMP_TYPE --allow-dirty
+          bump2version $VERSION_BUMP_TYPE --allow-dirty --new-version $IMAGE_TAG
 
   push_changes:
     needs: bump_versions
