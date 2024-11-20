@@ -30,7 +30,7 @@ on:
           - major
 
 jobs:
-  validate:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -68,6 +68,13 @@ jobs:
           echo "Linting Helm chart..."
           helm lint ./helm
 
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          version: 'latest'
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          project_id: $GCP_PROJECT_ID
+
       - name: Authenticate to GKE
         id: auth_gke
         run: |
@@ -76,16 +83,6 @@ jobs:
           gcloud container clusters get-credentials $CLUSTER_NAME \
             --zone $CLUSTER_ZONE \
             --project $GCP_PROJECT_ID
-          gcloud auth print-access-token > token.txt
-        continue-on-error: true
-
-      - name: Cache GKE Auth Token
-        uses: actions/cache@v4
-        with:
-          path: token.txt
-          key: ${{ runner.os }}-gke-token-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-gke-token-
 
       - name: Helm Dry-Run
         if: ${{ github.event.inputs.deployment_action == 'deploy' }}
@@ -100,42 +97,8 @@ jobs:
             --set app.deployment.image.tag=$IMAGE_TAG
             --dry-run
 
-  deploy:
-    needs: validate
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Restore GKE Auth Token
-        id: restore_token
-        uses: actions/cache@v4
-        with:
-          path: token.txt
-          key: ${{ runner.os }}-gke-token-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-gke-token-
-
-      - name: Set up gcloud CLI
-        uses: google-github-actions/setup-gcloud@v1
-        with:
-          version: 'latest'
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
-          project_id: $GCP_PROJECT_ID
-
-      - name: Authenticate to GKE
-        if: steps.restore_token.outputs.cache-hit != 'true'
-        run: |
-          echo "Authenticating to GKE..."
-          gcloud auth activate-service-account --key-file=${{ secrets.GCP_SA_KEY }}
-          gcloud container clusters get-credentials $CLUSTER_NAME \
-            --zone $CLUSTER_ZONE \
-            --project $GCP_PROJECT_ID
-          gcloud auth print-access-token > token.txt
-
       - name: Deploy with Helm
         if: ${{ github.event.inputs.deployment_action == 'deploy' }}
-
         run: |
           echo "Deploying Helm release..."
           helm upgrade --install $RELEASE_NAME ./helm \
