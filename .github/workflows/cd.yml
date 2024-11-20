@@ -186,6 +186,8 @@ jobs:
           pip install bump2version
 
       - name: Update Chart.yaml with app version
+        env:
+          IMAGE_TAG: ${{ github.event.inputs.image_tag }}
         run: |
           echo "Updating Chart.yaml with app version..."
           sed -i "s/^appVersion:.*/appVersion: $IMAGE_TAG/" ./helm/Chart.yaml
@@ -196,6 +198,9 @@ jobs:
           git config --global user.email "github-actions@github.com"
 
       - name: Bump Helm Chart Version
+        env:
+          VERSION_BUMP_TYPE: ${{ github.event.inputs.bump_type }}
+          IMAGE_TAG: ${{ github.event.inputs.image_tag }}
         run: |
           echo "Bumping Helm chart version as $VERSION_BUMP_TYPE..."
           bump2version $VERSION_BUMP_TYPE --allow-dirty --new-version $IMAGE_TAG
