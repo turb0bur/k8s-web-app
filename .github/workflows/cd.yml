@@ -172,7 +172,7 @@ jobs:
             exit 0
           fi
 
-  bump_versions:
+  update_chart_version:
     needs: deploy
     if: github.event.inputs.deployment_action == 'deploy'
     runs-on: ubuntu-latest
@@ -204,14 +204,8 @@ jobs:
           echo "Bumping Helm chart version as $VERSION_BUMP_TYPE..."
           bump2version $VERSION_BUMP_TYPE --allow-dirty
 
-  push_changes:
-    needs: bump_versions
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Push Changes to GitHub
         run: |
           echo "Pushing updated Chart.yaml to GitHub..."
-          git push origin HEAD:main
+          git remote set-url origin https://x-access-token:${{ secrets.REPOSITORY_TOKEN }}@github.com/${{ github.repository }}.git
+          git push origin HEAD:master
