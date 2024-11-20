@@ -18,7 +18,7 @@ on:
       namespace:
         description: 'Kubernetes namespace'
         required: true
-        default: ${{ secrets.K8S_NAMESPACE }}
+        default: 'web-app'
       bump_type:
         description: 'Version bump type'
         required: true
