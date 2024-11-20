@@ -3,6 +3,14 @@ name: CD
 on:
   workflow_dispatch:
     inputs:
+      enable_debug:
+        description: 'Enable debug'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
       image_tag:
         description: 'Image tag to deploy'
         required: true
@@ -40,6 +48,8 @@ jobs:
         id: setup_env
         run: |
           echo "Exporting required environment variables..."
+          echo "ACTIONS_RUNNER_DEBUG=${{ github.event.inputs.enable_debug }}" >> $GITHUB_ENV
+          echo "ACTIONS_STEP_DEBUG=${{ github.event.inputs.enable_debug }}" >> $GITHUB_ENV
           echo "GCP_PROJECT_ID=${{ vars.GCP_PROJECT_ID }}" >> $GITHUB_ENV
           echo "CLUSTER_ZONE=${{ vars.GKE_CLUSTER_ZONE }}" >> $GITHUB_ENV
           echo "CLUSTER_NAME=${{ vars.GKE_CLUSTER_NAME }}" >> $GITHUB_ENV
@@ -143,6 +153,16 @@ jobs:
         run: |
           echo "Deleting Helm release..."
           helm delete $RELEASE_NAME -n $K8S_NAMESPACE
+
+      - name: Check Helm Release
+        if: ${{ github.event.inputs.deployment_action == 'deploy' }}
+        run: |
+          if helm status $RELEASE_NAME &>/dev/null; then
+            echo "Helm release exists."
+          else
+            echo "Helm release does not exist, skipping rollback."
+            exit 0  # Explicitly exit with 0 to avoid marking the step as failed
+          fi
 
       - name: Rollback on Failure
         if: failure() && ${{ github.event.inputs.deployment_action == 'deploy' }}
