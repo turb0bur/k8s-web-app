@@ -157,7 +157,7 @@ jobs:
       - name: Check Helm Release
         if: ${{ github.event.inputs.deployment_action == 'deploy' }}
         run: |
-          if helm status $RELEASE_NAME &>/dev/null; then
+          if helm status $RELEASE_NAME -n $K8S_NAMESPACE &>/dev/null; then
             echo "Helm release exists."
           else
             echo "Helm release does not exist, skipping rollback."
@@ -168,10 +168,10 @@ jobs:
         if: failure() && ${{ github.event.inputs.deployment_action == 'deploy' }}
         run: |
           echo "Rolling back Helm release..."
-          if helm history $RELEASE_NAME --max 1 | grep -q $RELEASE_NAME; then
-            previous_revision=$(helm history $RELEASE_NAME --max 2 | awk 'NR==3 {print $1}')
+          if helm history $RELEASE_NAME -n $K8S_NAMESPACE --max 1 | grep -q $RELEASE_NAME; then
+            previous_revision=$(helm history $RELEASE_NAME -n $K8S_NAMESPACE --max 2 | awk 'NR==3 {print $1}')
             if [[ -n "$previous_revision" ]]; then
-              helm rollback $RELEASE_NAME "$previous_revision"
+              helm rollback $RELEASE_NAME -n $K8S_NAMESPACE "$previous_revision"
             else
               echo "No previous revision found, rollback skipped."
               exit 1
