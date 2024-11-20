@@ -188,8 +188,7 @@ jobs:
       - name: Update Chart.yaml with app version
         run: |
           echo "Updating Chart.yaml with app version..."
-          helm show chart ./helm > ./helm/Chart.yaml
-          sed -i "s/^appVersion:.*/appVersion: "$IMAGE_TAG/" ./helm/Chart.yaml
+          sed -i "s/^appVersion:.*/appVersion: $IMAGE_TAG/" ./helm/Chart.yaml
 
       - name: Set Git Author
         run: |
