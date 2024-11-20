@@ -74,7 +74,7 @@ jobs:
         run: |
           echo "Performing Helm dry-run..."
           helm upgrade --install $RELEASE_NAME ./helm \
-            ---namespace $K8S_NAMESPACE \
+            --namespace $K8S_NAMESPACE \
             --set db.secret.data.POSTGRES_DB=$DB_NAME \
             --set db.secret.data.POSTGRES_USER=$DB_USER \
             --set db.secret.data.POSTGRES_PASSWORD=$DB_PASSWORD \
@@ -109,7 +109,7 @@ jobs:
         run: |
           echo "Deploying Helm release..."
           helm upgrade --install $RELEASE_NAME ./helm \
-            ---namespace $K8S_NAMESPACE \
+            --namespace $K8S_NAMESPACE \
             --set db.secret.data.POSTGRES_DB=$DB_NAME \
             --set db.secret.data.POSTGRES_USER=$DB_USER \
             --set db.secret.data.POSTGRES_PASSWORD=$DB_PASSWORD \
