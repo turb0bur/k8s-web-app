@@ -104,7 +104,7 @@ jobs:
             --set db.secret.data.POSTGRES_USER=$DB_USER \
             --set db.secret.data.POSTGRES_PASSWORD=$DB_PASSWORD \
             --set app.secret.data.SECRET_KEY=$SECRET_KEY \
-            --set app.deployment.image.tag=$IMAGE_TAG
+            --set app.deployment.image.tag=$IMAGE_TAG \
             --dry-run
 
       - name: Deploy with Helm
