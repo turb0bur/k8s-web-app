@@ -83,6 +83,16 @@ jobs:
           echo "Installing gke-gcloud-auth-plugin..."
           gcloud components install gke-gcloud-auth-plugin
 
+      - name: Create GKE Cluster if not Exists
+        run: |
+          echo "Checking if GKE cluster exists..."
+          if ! gcloud container clusters describe $CLUSTER_NAME --zone $CLUSTER_ZONE --project $GCP_PROJECT_ID; then
+            echo "Cluster does not exist. Creating GKE cluster..."
+            gcloud container clusters create $CLUSTER_NAME --zone $CLUSTER_ZONE --project $GCP_PROJECT_ID
+          else
+            echo "Cluster already exists."
+          fi
+
       - name: Authenticate to GKE
         run: |
           gcloud container clusters get-credentials $CLUSTER_NAME \
