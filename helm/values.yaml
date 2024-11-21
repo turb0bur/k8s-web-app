@@ -33,6 +33,7 @@ db:
       POSTGRES_DB: webapp
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: <your-db-password>
+      PGDATA: /var/lib/postgresql/data/pgdata
   statefulset:
     name: postgres-statefulset
     serviceName: postgres-service

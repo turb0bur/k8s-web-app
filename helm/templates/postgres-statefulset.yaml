@@ -40,6 +40,11 @@ spec:
             secretKeyRef:
               name: postgres-secret
               key: POSTGRES_PASSWORD
+        - name: PGDATA
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: PGDATA
         ports:
         - containerPort: {{ .Values.db.statefulset.port }}
           name: postgres
