@@ -207,5 +207,5 @@ jobs:
       - name: Push Changes to GitHub
         run: |
           echo "Pushing updated Chart.yaml to GitHub..."
-          git remote set-url origin https://x-access-token:${{ secrets.REPOSITORY_TOKEN }}@github.com/${{ github.repository }}.git
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           git push origin HEAD:master
