@@ -21,7 +21,7 @@ app:
         cpu: "1"
   service:
     name: app-service
-    type: NodePort
+    type: LoadBalancer
     port: 5000
     targetPort: 5000
     nodePort: 30080
