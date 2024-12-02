@@ -1,12 +1,20 @@
-name: CD
+name: CD Green
 
 on:
   workflow_dispatch:
     inputs:
+      namespace:
+        description: 'Kubernetes namespace'
+        required: true
+        default: 'web-app'
       image_tag:
         description: 'Image tag to deploy'
         required: true
         default: 'latest'
+      green_replicas:
+        description: 'Amount of replicas for green deployment'
+        required: true
+        default: 1
       deployment_action:
         description: 'Deployment action'
         required: true
@@ -14,20 +22,7 @@ on:
         type: choice
         options:
           - deploy
-          - delete
-      namespace:
-        description: 'Kubernetes namespace'
-        required: true
-        default: 'web-app'
-      bump_type:
-        description: 'Version bump type'
-        required: true
-        default: 'patch'
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
+          - scale-down
 
 jobs:
   deploy:
@@ -45,7 +40,9 @@ jobs:
           echo "CLUSTER_NAME=${{ vars.GKE_CLUSTER_NAME }}" >> $GITHUB_ENV
           echo "K8S_NAMESPACE=${{ vars.K8S_NAMESPACE }}" >> $GITHUB_ENV
           echo "RELEASE_NAME=${{ vars.HELM_RELEASE_NAME }}" >> $GITHUB_ENV
+          echo "DEPLOYMENT_NAME=${{ vars.K8S_DEPLOY_BASENAME }}" >> $GITHUB_ENV
           echo "IMAGE_TAG=${{ github.event.inputs.image_tag }}" >> $GITHUB_ENV
+          echo "GREEN_REPLICAS=${{ github.event.inputs.green_replicas }}" >> $GITHUB_ENV
           echo "VERSION_BUMP_TYPE=${{ github.event.inputs.bump_type }}" >> $GITHUB_ENV
           echo "DB_NAME=${{ vars.DB_NAME }}" >> $GITHUB_ENV
           echo "DB_USER=${{ vars.DB_USER }}" >> $GITHUB_ENV
@@ -114,35 +111,40 @@ jobs:
             --set db.secret.data.POSTGRES_USER=$DB_USER \
             --set db.secret.data.POSTGRES_PASSWORD=$DB_PASSWORD \
             --set app.secret.data.SECRET_KEY=$SECRET_KEY \
-            --set app.deployment.image.tag=$IMAGE_TAG \
+            --set app.greenDeployment.name=$DEPLOYMENT_NAME-green \
+            --set app.greenDeployment.image.tag=$IMAGE_TAG \
+            --set app.greenDeployment.replicas=$GREEN_REPLICAS \
             --dry-run
 
-      - name: Deploy with Helm
+      - name: Deploy Green Deployment with Helm
         if: github.event.inputs.deployment_action == 'deploy'
         run: |
-          echo "Deploying Helm release..."
+          echo "Deploying green deployment with Helm..."
           helm upgrade --install $RELEASE_NAME ./helm \
             --namespace $K8S_NAMESPACE \
             --set db.secret.data.POSTGRES_DB=$DB_NAME \
             --set db.secret.data.POSTGRES_USER=$DB_USER \
             --set db.secret.data.POSTGRES_PASSWORD=$DB_PASSWORD \
             --set app.secret.data.SECRET_KEY=$SECRET_KEY \
-            --set app.deployment.image.tag=$IMAGE_TAG
+            --set app.greenDeployment.name=$DEPLOYMENT_NAME-green \
+            --set app.greenDeployment.image.tag=$IMAGE_TAG \
+            --set app.greenDeployment.replicas=$GREEN_REPLICAS
 
-      - name: Wait for Deployments to Stabilize
+      - name: Wait for Green Deployments to Stabilize
         if: github.event.inputs.deployment_action == 'deploy'
         run: |
           echo "Waiting for Kubernetes deployments to stabilize..."
-          deployments=$(kubectl get deployment -n $K8S_NAMESPACE -l "release=$RELEASE_NAME" -o jsonpath='{.items[*].metadata.name}')
-          for deployment in $deployments; do
-            kubectl rollout status deployment/$deployment -n $K8S_NAMESPACE
-          done
+          echo "Waiting for green deployment to stabilize..."
+          kubectl rollout status deployment/$DEPLOYMENT_NAME-green -n $K8S_NAMESPACE
 
-      - name: Delete Helm Release
-        if: ${{ github.event.inputs.deployment_action == 'delete' }}
+      - name: Scale Down Green Deployment
+        if: ${{ github.event.inputs.deployment_action == 'scale-down' }}
         run: |
-          echo "Deleting Helm release..."
-          helm delete $RELEASE_NAME -n $K8S_NAMESPACE
+          echo "Scaling down green deployment..."
+          helm upgrade --install $RELEASE_NAME ./helm \
+            --namespace $K8S_NAMESPACE \
+            --reuse-values \
+            --set app.greenDeployment.replicas=0
 
       - name: Check Helm Release
         if: github.event.inputs.deployment_action == 'deploy'
@@ -171,41 +173,3 @@ jobs:
             echo "Release not found, rollback skipped."
             exit 0
           fi
-
-  update_chart_version:
-    needs: deploy
-    if: github.event.inputs.deployment_action == 'deploy'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install bump2version
-        run: |
-          echo "Installing bump2version..."
-          pip install bump2version
-
-      - name: Update Chart.yaml with app version
-        env:
-          IMAGE_TAG: ${{ github.event.inputs.image_tag }}
-        run: |
-          echo "Updating Chart.yaml with app version..."
-          sed -i "s/^appVersion:.*/appVersion: $IMAGE_TAG/" ./helm/Chart.yaml
-
-      - name: Set Git Author
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "github-actions@github.com"
-
-      - name: Bump Helm Chart Version
-        env:
-          VERSION_BUMP_TYPE: ${{ github.event.inputs.bump_type }}
-        run: |
-          echo "Bumping Helm chart version as $VERSION_BUMP_TYPE..."
-          bump2version $VERSION_BUMP_TYPE --allow-dirty
-
-      - name: Push Changes to GitHub
-        run: |
-          echo "Pushing updated Chart.yaml to GitHub..."
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
-          git push origin HEAD:master

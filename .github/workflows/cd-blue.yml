@@ -1,0 +1,233 @@
+name: CD Blue
+
+on:
+  workflow_dispatch:
+    inputs:
+      namespace:
+        description: 'Kubernetes namespace'
+        required: true
+        default: 'web-app'
+      image_tag:
+        description: 'Image tag to deploy'
+        required: true
+        default: 'latest'
+      blue_replicas:
+        description: 'Amount of replicas for blue deployment'
+        required: true
+        default: 1
+      bump_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      deployment_action:
+        description: 'Deployment action'
+        required: true
+        default: 'deploy'
+        type: choice
+        options:
+          - deploy
+          - scale-down
+
+jobs:
+  deploy_blue:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set Environment Variables
+        id: setup_env
+        run: |
+          echo "Exporting required environment variables..."
+          echo "GCP_PROJECT_ID=${{ vars.GCP_PROJECT_ID }}" >> $GITHUB_ENV
+          echo "CLUSTER_ZONE=${{ vars.GKE_CLUSTER_ZONE }}" >> $GITHUB_ENV
+          echo "CLUSTER_NAME=${{ vars.GKE_CLUSTER_NAME }}" >> $GITHUB_ENV
+          echo "K8S_NAMESPACE=${{ vars.K8S_NAMESPACE }}" >> $GITHUB_ENV
+          echo "RELEASE_NAME=${{ vars.HELM_RELEASE_NAME }}" >> $GITHUB_ENV
+          echo "DEPLOYMENT_NAME=${{ vars.K8S_DEPLOY_BASENAME }}" >> $GITHUB_ENV
+          echo "IMAGE_TAG=${{ github.event.inputs.image_tag }}" >> $GITHUB_ENV
+          echo "BLUE_REPLICAS=${{ github.event.inputs.blue_replicas }}" >> $GITHUB_ENV
+          echo "VERSION_BUMP_TYPE=${{ github.event.inputs.bump_type }}" >> $GITHUB_ENV
+          echo "DB_NAME=${{ vars.DB_NAME }}" >> $GITHUB_ENV
+          echo "DB_USER=${{ vars.DB_USER }}" >> $GITHUB_ENV
+          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> $GITHUB_ENV
+          echo "SECRET_KEY=${{ secrets.APP_SECRET_KEY }}" >> $GITHUB_ENV
+
+      - name: Validate Inputs
+        run: |
+          echo "Validating image tag..."
+          if [[ "$IMAGE_TAG" != "latest" ]] && \
+             ! [[ "$IMAGE_TAG" =~ ^[a-f0-9]{7,}$ ]]; then
+            echo "Invalid image tag: $IMAGE_TAG."
+            echo "It must be 'latest' or a valid Git commit SHA (7+ characters)."
+            exit 1
+          fi
+          echo "Image tag validation passed."
+
+      - name: Helm Lint
+        run: |
+          echo "Linting Helm chart..."
+          helm lint ./helm
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Install gke-gcloud-auth-plugin
+        run: |
+          echo "Installing gke-gcloud-auth-plugin..."
+          gcloud components install gke-gcloud-auth-plugin
+
+      - name: Authenticate to GKE
+        run: |
+          gcloud container clusters get-credentials $CLUSTER_NAME \
+            --zone $CLUSTER_ZONE \
+            --project $GCP_PROJECT_ID
+
+      - name: Ensure Green Deployment Exists and Ready
+        if: github.event.inputs.deployment_action == 'deploy'
+        run: |
+          echo "Ensuring green deployment exists and is ready..."
+          if kubectl get deployment/$DEPLOYMENT_NAME-green -n $K8S_NAMESPACE; then
+            green_image_tag=$(kubectl get deployment/$DEPLOYMENT_NAME-green -n $K8S_NAMESPACE -o jsonpath="{.spec.template.spec.containers[0].image}" | cut -d':' -f2)
+            if [[ "$green_image_tag" != "$IMAGE_TAG" ]]; then
+              echo "Green deployment image tag ($green_image_tag) does not match the provided image tag ($IMAGE_TAG). Exiting..."
+              exit 1
+            fi
+            kubectl rollout status deployment/$DEPLOYMENT_NAME-green -n $K8S_NAMESPACE
+          else
+            echo "Green deployment does not exist. Exiting..."
+            exit 1
+          fi
+
+      - name: Helm Dry-Run for Blue Deployment
+        if: github.event.inputs.deployment_action == 'deploy'
+        run: |
+          echo "Performing Helm dry-run for blue deployment..."
+          helm upgrade --install $RELEASE_NAME ./helm \
+            --namespace $K8S_NAMESPACE \
+            --reuse-values \
+            --set app.blueDeployment.image.tag=$IMAGE_TAG \
+            --set app.blueDeployment.replicas=$BLUE_REPLICAS \
+            --dry-run
+
+      - name: Deploy Blue Deployment with Helm
+        if: github.event.inputs.deployment_action == 'deploy'
+        run: |
+          echo "Deploying blue deployment with Helm..."
+          helm upgrade --install $RELEASE_NAME ./helm \
+            --namespace $K8S_NAMESPACE \
+            --reuse-values \
+            --set app.blueDeployment.image.tag=$IMAGE_TAG \
+            --set app.blueDeployment.replicas=$BLUE_REPLICAS
+
+      - name: Wait for Blue Deployment to Stabilize
+        if: github.event.inputs.deployment_action == 'deploy'
+        run: |
+          echo "Waiting for blue deployment to stabilize..."
+          kubectl rollout status deployment/$RELEASE_NAME -n $K8S_NAMESPACE
+
+      - name: Helm Dry-Run for Blue Deployment
+        if: github.event.inputs.deployment_action == 'deploy'
+        run: |
+          echo "Performing Helm dry-run for blue deployment..."
+          helm upgrade --install $RELEASE_NAME ./helm \
+            --namespace $K8S_NAMESPACE \
+            --reuse-values \
+            --set app.blueDeployment.name=$DEPLOYMENT_NAME-blue \
+            --set app.blueDeployment.image.tag=$IMAGE_TAG \
+            --set app.blueDeployment.replicas=$BLUE_REPLICAS \
+            --dry-run
+
+      - name: Deploy Blue Deployment with Helm
+        if: github.event.inputs.deployment_action == 'deploy'
+        run: |
+          echo "Deploying blue deployment with Helm..."
+          helm upgrade --install $RELEASE_NAME ./helm \
+            --namespace $K8S_NAMESPACE \
+            --reuse-values \
+            --set app.blueDeployment.name=$DEPLOYMENT_NAME-blue \
+            --set app.blueDeployment.image.tag=$IMAGE_TAG \
+            --set app.blueDeployment.replicas=$BLUE_REPLICAS
+
+      - name: Wait for Blue Deployment to Stabilize
+        if: github.event.inputs.deployment_action == 'deploy'
+        run: |
+          echo "Waiting for blue deployment to stabilize..."
+          kubectl rollout status deployment/$DEPLOYMENT_NAME-blue -n $K8S_NAMESPACE
+
+      - name: Scale Down Blue Deployment
+        if: ${{ github.event.inputs.deployment_action == 'scale-down' }}
+        run: |
+          echo "Scaling down blue deployment..."
+          helm upgrade --install $RELEASE_NAME ./helm \
+            --namespace $K8S_NAMESPACE \
+            --reuse-values \
+            --set app.blueDeployment.replicas=0
+
+      - name: Rollback on Failure
+        if: failure() && github.event.inputs.deployment_action == 'deploy'
+        run: |
+          echo "Rolling back Helm release..."
+          if helm history $RELEASE_NAME -n $K8S_NAMESPACE --max 1 | grep -q $RELEASE_NAME; then
+            previous_revision=$(helm history $RELEASE_NAME -n $K8S_NAMESPACE --max 2 | awk 'NR==3 {print $1}')
+            if [[ -n "$previous_revision" ]]; then
+              helm rollback $RELEASE_NAME -n $K8S_NAMESPACE "$previous_revision"
+              exit 1
+            else
+              echo "No previous revision found, rollback skipped."
+              exit 0
+            fi
+          else
+            echo "Release not found, rollback skipped."
+            exit 0
+          fi
+
+  update_chart_version:
+    needs: deploy_blue
+    if: github.event.inputs.deployment_action == 'deploy'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install bump2version
+        run: |
+          echo "Installing bump2version..."
+          pip install bump2version
+
+      - name: Update Chart.yaml with app version
+        env:
+          IMAGE_TAG: ${{ github.event.inputs.image_tag }}
+        run: |
+          echo "Updating Chart.yaml with app version..."
+          sed -i "s/^appVersion:.*/appVersion: $IMAGE_TAG/" ./helm/Chart.yaml
+
+      - name: Set Git Author
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "github-actions@github.com"
+
+      - name: Bump Helm Chart Version
+        env:
+          VERSION_BUMP_TYPE: ${{ github.event.inputs.bump_type }}
+        run: |
+          echo "Bumping Helm chart version as $VERSION_BUMP_TYPE..."
+          bump2version $VERSION_BUMP_TYPE --allow-dirty
+
+      - name: Push Changes to GitHub
+        run: |
+          echo "Pushing updated Chart.yaml to GitHub..."
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          git push origin HEAD:master
