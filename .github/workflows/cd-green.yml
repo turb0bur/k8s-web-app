@@ -25,7 +25,7 @@ on:
           - scale-down
 
 jobs:
-  deploy:
+  deploy_green:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
