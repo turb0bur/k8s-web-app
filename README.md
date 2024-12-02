@@ -114,58 +114,41 @@ You should deploy all resources into a dedicated namespace.
 kubectl create namespace web-app
 ```
 
-#### Create ConfigMap and Secrets
-
-Store application configurations (non-sensitive data) in a ConfigMap and sensitive data (e.g., database credentials) in
-Secrets
+#### Initial Deployment via Helm
 
 ```bash
-kubectl -n web-app apply -f k8s/postgres-config.yaml
-kubectl -n web-app apply -f k8s/postgres-secret.yaml
-kubectl -n web-app apply -f k8s/app-config.yaml
-kubectl -n web-app apply -f k8s/app-secret.yaml
+helm install -n web-app python-app ./helm
 ``` 
 
-#### Deploy PostgreSQL (StatefulSet)
-
-PostgreSQL is deployed as a StatefulSet for better persistence and stable network identity.
+#### Deploy Green Deployment:
 
 ```bash
-kubectl -n web-app apply -f k8s/postgres-statefulset.yaml
+helm upgrade -n web-app python-app ./helm --reuse-values --set app.greenDeployment.image.tag=<NEW_IMAGE_TAG> \
+--set app.greenDeployment.replicas=2
 ```
 
-#### Create PostgreSQL Services
-
-- **Headless Service**: For stable DNS and direct pod access
-- **ClusterIP Service**: For internal application connections
+#### Deploy fully tested on the Green Deployment Docker image to the Blue one:
 
 ```bash
-kubectl -n web-app apply -f k8s/postgres-headless.yaml 
-kubectl -n web-app apply -f k8s/postgres-service.yaml
+helm upgrade -n web-app python-app ./helm  --reuse-values --set app.blueDeployment.image.tag=<NEW_IMAGE_TAG> \
+--set app.blueDeployment.replicas=2 
 ```
 
-#### Deploy the Python Web Application
-
-Now, deploy the Python app using a Deployment resource:
+#### Remove the Green pods:
 
 ```bash
-kubectl -n web-app apply -f k8s/app-deployment.yaml
+helm upgrade -n web-app python-app ./helm  --reuse-values --set app.greenDeployment.replicas=0 
 ```
 
-#### Create a Service for the Application
 
-Expose the Python app using a Service for internal/external access:
+#### Access both deployment of the Application
 
-```bash
-kubectl -n web-app apply -f k8s/app-service.yaml
-```
-
-#### Access the Application
-
-In Minikube, you can access the app using the Minikube IP:
+In Minikube, you can access the app using the Minikube IP. 
+Please do it in a separate terminal windows.
 
 ```bash
-minikube service app-service -n web-app
+minikube service app-service-green -n web-app
+minikube service app-service-blue -n web-app
 ```
 
 #### Cleanup
@@ -173,6 +156,7 @@ minikube service app-service -n web-app
 To remove the Kubernetes resources, run:
 
 ```bash
+helm uninstall -n web-app python-app
 kubectl delete namespace web-app
 ```
 
