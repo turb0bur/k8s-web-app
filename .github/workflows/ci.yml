@@ -5,7 +5,7 @@ on:
     branches:
       - master
     paths-ignore:
-      - 'k8s/**'
+      - 'helm/**'
       - 'README.md'
       - 'docker-compose.yml'
       - '.env.example'
