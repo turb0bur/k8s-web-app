@@ -1,17 +1,17 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Values.app.deployment.name }}
+  name: {{ .Values.app.blueDeployment.name }}
   namespace: {{ .Release.Namespace }}
 spec:
-  replicas: {{ .Values.app.deployment.replicas }}
+  replicas: {{ .Values.app.blueDeployment.replicas }}
   selector:
     matchLabels:
-      {{ include "appLabels" . }}
+      {{ include "blueAppLabels" . }}
   template:
     metadata:
       labels:
-        {{ include "appLabels" . }}
+        {{ include "blueAppLabels" . }}
     spec:
       initContainers:
         - name: wait-for-postgres
@@ -19,15 +19,15 @@ spec:
           command: ['sh', '-c', 'until nc -z {{ .Values.db.service.name }} {{ .Values.db.service.port }}; do echo waiting for postgres; sleep 2; done;']
       containers:
       - name: python-web-app
-        image: {{ .Values.app.deployment.image.repository }}:{{ .Values.app.deployment.image.tag }}
-        imagePullPolicy: {{ .Values.app.deployment.image.pullPolicy }}
+        image: {{ .Values.app.blueDeployment.image.repository }}:{{ .Values.app.blueDeployment.image.tag }}
+        imagePullPolicy: {{ .Values.app.blueDeployment.image.pullPolicy }}
         resources:
           requests:
-            memory: {{ .Values.app.deployment.resources.requests.memory }}
-            cpu: {{ .Values.app.deployment.resources.requests.cpu }}
+            memory: {{ .Values.app.blueDeployment.resources.requests.memory }}
+            cpu: {{ .Values.app.blueDeployment.resources.requests.cpu }}
           limits:
-            memory: {{ .Values.app.deployment.resources.limits.memory }}
-            cpu: {{ .Values.app.deployment.resources.limits.cpu }}
+            memory: {{ .Values.app.blueDeployment.resources.limits.memory }}
+            cpu: {{ .Values.app.blueDeployment.resources.limits.cpu }}
         env:
         - name: SECRET_KEY
           valueFrom:

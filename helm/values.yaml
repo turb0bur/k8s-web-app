@@ -5,11 +5,11 @@ app:
     name: app-secret
     data:
       SECRET_KEY: <your-app-secret>
-  deployment:
-    name: app-deployment
+  greenDeployment:
+    name: app-deployment-green
     replicas: 1
     image:
-      repository: turb0bur/flask-crud
+      repository: turb0bur/fastapi-crud
       tag: latest
       pullPolicy: IfNotPresent
     resources:
@@ -19,12 +19,32 @@ app:
       limits:
         memory: "512Mi"
         cpu: "1"
-  service:
-    name: app-service
+  blueDeployment:
+    name: app-deployment-blue
+    replicas: 0
+    image:
+      repository: turb0bur/fastapi-crud
+      tag: latest
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "500m"
+      limits:
+        memory: "512Mi"
+        cpu: "1"
+  greenService:
+    name: app-service-green
     type: LoadBalancer
     port: 5000
     targetPort: 5000
     nodePort: 30080
+  blueService:
+    name: app-service-blue
+    type: LoadBalancer
+    port: 5000
+    targetPort: 5000
+    nodePort: 30081
 
 db:
   secret:

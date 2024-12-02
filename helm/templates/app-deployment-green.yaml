@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.app.greenDeployment.name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: {{ .Values.app.greenDeployment.replicas }}
+  selector:
+    matchLabels:
+      {{ include "greenAppLabels" . }}
+  template:
+    metadata:
+      labels:
+        {{ include "greenAppLabels" . }}
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox
+          command: ['sh', '-c', 'until nc -z {{ .Values.db.service.name }} {{ .Values.db.service.port }}; do echo waiting for postgres; sleep 2; done;']
+      containers:
+      - name: python-web-app
+        image: {{ .Values.app.greenDeployment.image.repository }}:{{ .Values.app.greenDeployment.image.tag }}
+        imagePullPolicy: {{ .Values.app.greenDeployment.image.pullPolicy }}
+        resources:
+          requests:
+            memory: {{ .Values.app.greenDeployment.resources.requests.memory }}
+            cpu: {{ .Values.app.greenDeployment.resources.requests.cpu }}
+          limits:
+            memory: {{ .Values.app.greenDeployment.resources.limits.memory }}
+            cpu: {{ .Values.app.greenDeployment.resources.limits.cpu }}
+        env:
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secret
+              key: SECRET_KEY
+        - name: DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: DB_HOST
+        - name: DB_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: DB_PORT
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_DB
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_USER
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_PASSWORD
