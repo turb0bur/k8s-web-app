@@ -116,7 +116,7 @@ jobs:
           echo "Ensuring Test deployment exists and is ready..."
           if kubectl get deployment/$DEPLOYMENT_NAME-$TEST_COLOR -n $K8S_NAMESPACE; then
             test_image_tag=$(kubectl get deployment/$DEPLOYMENT_NAME-$TEST_COLOR -n $K8S_NAMESPACE -o jsonpath="{.spec.template.spec.containers[0].image}" | cut -d':' -f2)
-            if [[ "test_image_tag" != "$IMAGE_TAG" ]]; then
+            if [[ "$test_image_tag" != "$IMAGE_TAG" ]]; then
               echo "Test deployment image tag ($test_image_tag) does not match the provided image tag ($IMAGE_TAG). Exiting..."
               exit 1
             fi
