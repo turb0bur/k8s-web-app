@@ -90,5 +90,6 @@ jobs:
             --cache-to=type=local,dest=/tmp/.buildx-cache \
             --platform linux/amd64,linux/arm64 \
             --tag ${{ vars.DOCKER_USERNAME }}/${{ vars.DOCKER_REPOSITORY }}:${SHORT_SHA} \
+            --tag ${{ vars.DOCKER_USERNAME }}/${{ vars.DOCKER_REPOSITORY }}:latest \
             --push \
             web/
