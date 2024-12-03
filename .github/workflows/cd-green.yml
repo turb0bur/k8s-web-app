@@ -155,9 +155,9 @@ jobs:
         run: |
           echo "Waiting for Kubernetes deployments to stabilize..."
           echo "Waiting for ${TEST_COLOR} deployment to stabilize..."
-          kubectl rollout status deployment/$DEPLOYMENT_NAME-${TEST_COLOR} -n $K8S_NAMESPACE
+          kubectl rollout status deployment/$DEPLOYMENT_NAME-$TEST_COLOR -n $K8S_NAMESPACE
 
-      - name: Scale Down ${TEST_COLOR} Deployment
+      - name: Scale Down $TEST_COLOR Deployment
         if: ${{ github.event.inputs.deployment_action == 'scale-down' }}
         run: |
           echo "Scaling down green deployment..."
