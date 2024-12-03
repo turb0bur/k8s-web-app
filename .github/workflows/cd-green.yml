@@ -11,8 +11,8 @@ on:
         description: 'Image tag to deploy'
         required: true
         default: 'latest'
-      green_replicas:
-        description: 'Amount of replicas for green deployment'
+      test_replicas:
+        description: 'Amount of replicas for Test deployment'
         required: true
         default: 1
       deployment_action:
@@ -42,7 +42,7 @@ jobs:
           echo "RELEASE_NAME=${{ vars.HELM_RELEASE_NAME }}" >> $GITHUB_ENV
           echo "DEPLOYMENT_NAME=${{ vars.K8S_DEPLOY_BASENAME }}" >> $GITHUB_ENV
           echo "IMAGE_TAG=${{ github.event.inputs.image_tag }}" >> $GITHUB_ENV
-          echo "GREEN_REPLICAS=${{ github.event.inputs.green_replicas }}" >> $GITHUB_ENV
+          echo "TEST_REPLICAS=${{ github.event.inputs.test_replicas }}" >> $GITHUB_ENV
           echo "VERSION_BUMP_TYPE=${{ github.event.inputs.bump_type }}" >> $GITHUB_ENV
           echo "DB_NAME=${{ vars.DB_NAME }}" >> $GITHUB_ENV
           echo "DB_USER=${{ vars.DB_USER }}" >> $GITHUB_ENV
@@ -101,6 +101,26 @@ jobs:
           echo "Creating Kubernetes namespace if it does not exist..."
           kubectl get namespace $K8S_NAMESPACE || kubectl create namespace $K8S_NAMESPACE
 
+      - name: Get current color mapping
+        id: get_colors
+        run: |
+          echo "Checking if Helm release exists..."
+          if helm status $RELEASE_NAME -n $K8S_NAMESPACE &>/dev/null; then
+            echo "Helm release exists. Retrieving current Helm values..."
+            current_values=$(helm get values $RELEASE_NAME -n $K8S_NAMESPACE --all)
+            liveColor=$(echo "$current_values" | yq e '.liveColor' -)
+            testColor=$(echo "$current_values" | yq e '.testColor' -)
+            if [ "$liveColor" != "$testColor" ]; then
+              echo "Setting colors as environment variables..."
+              echo "LIVE_COLOR=$liveColor" >> $GITHUB_ENV
+              echo "TEST_COLOR=$testColor" >> $GITHUB_ENV
+            else
+              echo "liveColor and testColor are equal. Skipping setting environment variables."
+            fi
+          else
+            echo "Helm release does not exist. Skipping color retrieval."
+          fi
+
       - name: Helm Dry-Run
         if: github.event.inputs.deployment_action == 'deploy'
         run: |
@@ -111,9 +131,9 @@ jobs:
             --set db.secret.data.POSTGRES_USER=$DB_USER \
             --set db.secret.data.POSTGRES_PASSWORD=$DB_PASSWORD \
             --set app.secret.data.SECRET_KEY=$SECRET_KEY \
-            --set app.greenDeployment.name=$DEPLOYMENT_NAME-green \
-            --set app.greenDeployment.image.tag=$IMAGE_TAG \
-            --set app.greenDeployment.replicas=$GREEN_REPLICAS \
+            --set app.${TEST_COLOR}Deployment.name=$DEPLOYMENT_NAME-${TEST_COLOR} \
+            --set app.${TEST_COLOR}Deployment.image.tag=$IMAGE_TAG \
+            --set app.${TEST_COLOR}Deployment.replicas=$TEST_REPLICAS \
             --dry-run
 
       - name: Deploy Green Deployment with Helm
@@ -126,25 +146,25 @@ jobs:
             --set db.secret.data.POSTGRES_USER=$DB_USER \
             --set db.secret.data.POSTGRES_PASSWORD=$DB_PASSWORD \
             --set app.secret.data.SECRET_KEY=$SECRET_KEY \
-            --set app.greenDeployment.name=$DEPLOYMENT_NAME-green \
-            --set app.greenDeployment.image.tag=$IMAGE_TAG \
-            --set app.greenDeployment.replicas=$GREEN_REPLICAS
+            --set app.${TEST_COLOR}Deployment.name=$DEPLOYMENT_NAME-${TEST_COLOR} \
+            --set app.${TEST_COLOR}Deployment.image.tag=$IMAGE_TAG \
+            --set app.${TEST_COLOR}Deployment.replicas=$TEST_REPLICAS
 
-      - name: Wait for Green Deployments to Stabilize
+      - name: Wait for Test Deployments to Stabilize
         if: github.event.inputs.deployment_action == 'deploy'
         run: |
           echo "Waiting for Kubernetes deployments to stabilize..."
-          echo "Waiting for green deployment to stabilize..."
-          kubectl rollout status deployment/$DEPLOYMENT_NAME-green -n $K8S_NAMESPACE
+          echo "Waiting for ${TEST_COLOR} deployment to stabilize..."
+          kubectl rollout status deployment/$DEPLOYMENT_NAME-${TEST_COLOR} -n $K8S_NAMESPACE
 
-      - name: Scale Down Green Deployment
+      - name: Scale Down ${TEST_COLOR} Deployment
         if: ${{ github.event.inputs.deployment_action == 'scale-down' }}
         run: |
           echo "Scaling down green deployment..."
           helm upgrade --install $RELEASE_NAME ./helm \
             --namespace $K8S_NAMESPACE \
             --reuse-values \
-            --set app.greenDeployment.replicas=0
+            --set app.${TEST_COLOR}Deployment.replicas=0
 
       - name: Check Helm Release
         if: github.event.inputs.deployment_action == 'deploy'
