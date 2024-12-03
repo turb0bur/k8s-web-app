@@ -127,6 +127,7 @@ jobs:
           echo "Performing Helm dry-run..."
           helm upgrade --install $RELEASE_NAME ./helm \
             --namespace $K8S_NAMESPACE \
+            --reuse-values \
             --set db.secret.data.POSTGRES_DB=$DB_NAME \
             --set db.secret.data.POSTGRES_USER=$DB_USER \
             --set db.secret.data.POSTGRES_PASSWORD=$DB_PASSWORD \
@@ -136,12 +137,13 @@ jobs:
             --set app.${TEST_COLOR}Deployment.replicas=$TEST_REPLICAS \
             --dry-run
 
-      - name: Deploy Green Deployment with Helm
+      - name: Deploy Test Deployment with Helm
         if: github.event.inputs.deployment_action == 'deploy'
         run: |
-          echo "Deploying green deployment with Helm..."
+          echo "Deploying Test deployment with Helm..."
           helm upgrade --install $RELEASE_NAME ./helm \
             --namespace $K8S_NAMESPACE \
+            --reuse-values \
             --set db.secret.data.POSTGRES_DB=$DB_NAME \
             --set db.secret.data.POSTGRES_USER=$DB_USER \
             --set db.secret.data.POSTGRES_PASSWORD=$DB_PASSWORD \
