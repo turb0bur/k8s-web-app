@@ -1,3 +1,6 @@
+liveColor: blue
+testColor: green
+
 app:
   config:
     name: app-config
@@ -33,14 +36,14 @@ app:
       limits:
         memory: "512Mi"
         cpu: "1"
-  greenService:
-    name: app-service-green
+  testService:
+    name: app-service-test
     type: LoadBalancer
     port: 5000
     targetPort: 5000
     nodePort: 30080
-  blueService:
-    name: app-service-blue
+  liveService:
+    name: app-service-live
     type: LoadBalancer
     port: 5000
     targetPort: 5000

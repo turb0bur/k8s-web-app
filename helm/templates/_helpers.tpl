@@ -1,7 +1,7 @@
-{{- define "greenAppLabels" -}}
-app: python-app-green
+{{- define "testAppLabels" -}}
+app: python-app-{{ .Values.testColor }}
 {{- end -}}
 
-{{- define "blueAppLabels" -}}
-app: python-app-blue
+{{- define "liveAppLabels" -}}
+app: python-app-{{ .Values.liveColor }}
 {{- end -}}

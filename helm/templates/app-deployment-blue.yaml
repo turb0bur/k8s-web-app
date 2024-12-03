@@ -7,11 +7,11 @@ spec:
   replicas: {{ .Values.app.blueDeployment.replicas }}
   selector:
     matchLabels:
-      {{ include "blueAppLabels" . }}
+      app: python-app-blue
   template:
     metadata:
       labels:
-        {{ include "blueAppLabels" . }}
+        app: python-app-blue
     spec:
       initContainers:
         - name: wait-for-postgres

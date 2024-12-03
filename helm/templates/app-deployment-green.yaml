@@ -7,11 +7,11 @@ spec:
   replicas: {{ .Values.app.greenDeployment.replicas }}
   selector:
     matchLabels:
-      {{ include "greenAppLabels" . }}
+      app: python-app-green
   template:
     metadata:
       labels:
-        {{ include "greenAppLabels" . }}
+        app: python-app-green
     spec:
       initContainers:
         - name: wait-for-postgres
